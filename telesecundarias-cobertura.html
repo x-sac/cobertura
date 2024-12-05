@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cobertura de señal en telesecundarias</title>
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js'></script>
+    <script src="https://unpkg.com/pmtiles@3.0.6/dist/pmtiles.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body,
+        #map {
+            height: 100%;
+        }
+
+        .info-box {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: white;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            padding: 15px;
+            width: 270px;
+            font-family: 'Space Grotesk', sans-serif;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transition: height 0.5s ease, padding 0.5s ease, transform 0.5s ease;
+        }
+
+        .info-box h2 {
+            font-weight: bold;
+            font-size: 20px;
+            margin: 0;
+        }
+
+        .legend-section {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .legend-title-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 5px 0;
+        }
+
+        .legend-title {
+            font-size: 15px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+
+        .legend-row {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .circle {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+        }
+
+        .circle-si {
+            background-color: #00724E;
+        }
+
+        .circle-no {
+            background-color: #b1394e;
+        }
+
+        .circle-altan {
+            background-color: #b38e5d;
+        }
+
+        .circle-cfe {
+            background-color: #332E28;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 34px;
+            height: 20px;
+            margin-left: 5px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: #2196F3;
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(14px);
+        }
+
+        .switch input:disabled+.slider {
+            background-color: #eee;
+            cursor: not-allowed;
+        }
+
+        .switch input:disabled+.slider:before {
+            background-color: #ccc;
+            transform: none;
+        }
+
+        .hamburger {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            font-size: 25px;
+            background-color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 5px;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
+        .info-box.collapsed {
+            height: 35px;
+            overflow: hidden;
+            transition: height 0.5s ease;
+            display: flex;
+            align-items: right;
+            justify-content: space-between;
+            padding: 10px;
+        }
+
+        .info-box.collapsed .hamburger {
+            position: static;
+            margin: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+        }
+
+        .info-box:not(.collapsed) {
+            transform: scale(1);
+            transition: height 0.5s ease, padding 0.5s ease, transform 0.5s ease;
+        }
+
+        .info-box.collapsed h2 {
+            font-size: 20px;
+            margin: 0;
+        }
+
+        .info-box.collapsed p,
+        .info-box.collapsed .legend-section {
+            display: none;
+        }
+
+        .info-box.collapsed #hamburger-menu {
+            display: block;
+            position: absolute;
+            top: 2px;
+            right: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <div id="info-box" class="info-box">
+        <h2>Cobertura de internet</h2>
+        <button id="hamburger-menu" class="hamburger" onclick="toggleMenu()">☰</button>
+
+        <!-- Torres ALTAN -->
+        <div class="legend-section">
+            <div class="legend-title-container">
+                <span class="legend-title">Torres ALTAN</span>
+                <label class="switch">
+                    <input type="checkbox" id="torresAltanSwitch" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="legend-row">
+                <div class="circle circle-altan"></div>
+                <span>Torres</span>
+            </div>
+        </div>
+
+        <!-- Torres CFE -->
+        <div class="legend-section">
+            <div class="legend-title-container">
+                <span class="legend-title">Torres CFE</span>
+                <label class="switch">
+                    <input type="checkbox" id="torresCfeSwitch" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="legend-row">
+                <div class="circle circle-cfe"></div>
+                <span>Torres</span>
+            </div>
+        </div>
+
+        <!-- Telesecundarias -->
+        <div class="legend-section">
+            <div class="legend-title-container">
+                <span class="legend-title">Cobertura: telesecundarias</span>
+                <label class="switch">
+                    <!-- NO checked aquí -->
+                    <input type="checkbox" id="telesecundariasSwitch">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <!-- Si -->
+            <div class="legend-row">
+                <div class="circle circle-si"></div>
+                <span>Si</span>
+                <label class="switch">
+                    <input type="checkbox" id="telesecundariasSiSwitch" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <!-- No -->
+            <div class="legend-row">
+                <div class="circle circle-no"></div>
+                <span>No</span>
+                <label class="switch">
+                    <input type="checkbox" id="telesecundariasNoSwitch" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Telebachilleratos -->
+        <div class="legend-section">
+            <div class="legend-title-container">
+                <span class="legend-title">Cobertura: telebachilleratos</span>
+                <label class="switch">
+                    <!-- NO checked aquí -->
+                    <input type="checkbox" id="telebachilleresSwitch">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <!-- Si -->
+            <div class="legend-row">
+                <div class="circle circle-si"></div>
+                <span>Si</span>
+                <label class="switch">
+                    <input type="checkbox" id="telebachilleresSiSwitch" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <!-- No -->
+            <div class="legend-row">
+                <div class="circle circle-no"></div>
+                <span>No</span>
+                <label class="switch">
+                    <input type="checkbox" id="telebachilleresNoSwitch" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+    </div>
+</body>
+<script>
+    // Inicializar el mapa
+    const map = new maplibregl.Map({
+        container: 'map',
+        style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+        center: [-102.5, 23.5], // Coordenadas iniciales (México)
+        zoom: 4.7,
+        attributionControl: false // Desactiva las atribuciones por defecto
+    });
+    // Agregar tu atribución personalizada
+    map.addControl(new maplibregl.AttributionControl({
+        customAttribution: 'ADyT',
+        compact: true
+    }), 'bottom-right');
+
+    map.on('load', () => {
+        // Agregar la fuente raster DEM
+        map.addSource('terrain-source', {
+            type: 'raster-dem',
+            tiles: [
+                'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
+            ],
+            tileSize: 256,
+            maxzoom: 15,
+            encoding: 'terrarium',
+        });
+
+        // Activar terreno en 3D
+        map.setTerrain({
+            source: 'terrain-source',
+            exaggeration: 2 // Exageración para sombras más realistas
+        });
+
+        // Agregar capa de sombras dinámicas
+        map.addLayer({
+            id: 'hillshade-layer',
+            type: 'hillshade',
+            source: 'terrain-source',
+            paint: {
+                'hillshade-exaggeration': 0.7,
+                'hillshade-shadow-color': '#aaaaaa',
+                'hillshade-highlight-color': '#ffffff',
+                'hillshade-accent-color': '#888888'
+            },
+            layout: {
+                'visibility': 'none' // inicialmente oculto hasta que activemos el terreno
+            }
+        });
+
+        // Fuente telesecundarias
+        map.addSource('telesecundarias', {
+            type: 'geojson',
+            data: './telesecundaria.geojson'
+        });
+
+        // Capa telesecundarias
+        map.addLayer({
+            id: 'telesecundarias-layer',
+            type: 'circle',
+            source: 'telesecundarias',
+            paint: {
+                'circle-color': [
+                    'match',
+                    ['get', 'Cobertura'],
+                    'si', '#00724E',
+                    'no', '#b1394e',
+                    '#cccccc'
+                ],
+                'circle-radius': 2,
+                'circle-opacity': 0.8
+            },
+
+            filter: ["match", ["get", "Cobertura"], ["si", "no"], true, false]
+        });
+
+        // Fuente telebachilleratos
+        map.addSource('telebachilleres', {
+            type: 'geojson',
+            data: './telebachilleres.geojson'
+        });
+
+        // Capa telebachilleratos
+        map.addLayer({
+            id: 'telebachilleres-layer',
+            type: 'circle',
+            source: 'telebachilleres',
+            paint: {
+                'circle-color': [
+                    'match',
+                    ['get', 'Cobertura'],
+                    'si', '#00724E',
+                    'no', '#b1394e',
+                    '#cccccc'
+                ],
+                'circle-radius': 2,
+                'circle-opacity': 0.8
+            },
+            filter: ["match", ["get", "Cobertura"], ["si", "no"], true, false]
+        });
+        // Torres ALTAN
+        map.addSource('torres-altan', {
+            type: 'geojson',
+            data: './torres_altlan.geojson'
+        });
+        map.addLayer({
+            id: 'torres-altan-layer',
+            type: 'circle',
+            source: 'torres-altan',
+            paint: {
+                'circle-color': '#b38e5d',
+                'circle-radius': 2,
+                'circle-opacity': 0.8
+            }
+        });
+
+        // Torres CFE
+        map.addSource('torres-cfe', {
+            type: 'geojson',
+            data: './torres_cfe.geojson'
+        });
+        map.addLayer({
+            id: 'torres-cfe-layer',
+            type: 'circle',
+            source: 'torres-cfe',
+            paint: {
+                'circle-color': '#332E28',
+                'circle-radius': 2,
+                'circle-opacity': 0.8
+            }
+        });
+
+        // Ajustar visibilidad inicial:
+        // Apagar telesecundarias y telebachilleratos
+        map.setLayoutProperty('telesecundarias-layer', 'visibility', 'none');
+        map.setLayoutProperty('telebachilleres-layer', 'visibility', 'none');
+
+        // Agregar controles de navegación
+        map.addControl(
+            new maplibregl.NavigationControl({
+                visualizePitch: true,
+                showZoom: true,
+                showCompass: true
+            }),
+            'top-right'
+        );
+
+        // Agregar control de terreno
+        const terrainControl = new maplibregl.TerrainControl({
+            source: 'terrain-source',
+            exaggeration: 1
+        });
+        map.addControl(terrainControl, 'top-right');
+
+        // Desactivar el terreno inicialmente
+        map.setTerrain(null);
+    });
+
+    // Eventos para popup dentro de map.on('load')
+    // Verifica que los archivos geojson contengan las propiedades solicitadas
+    const popup = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false
+    });
+    // Torres ALTAN
+    map.on('mouseenter', 'torres-altan-layer', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const prop = e.features[0].properties;
+        const marcaRAN = prop['Marca RAN'] || 'Sin información';
+        const tipoRAN = prop['Tipo RAN'] || 'Sin información';
+        const alturaRAN = prop['Altura RAN (m)'] || 'Sin información';
+        const proveedorBackhaul = prop['Proveedor backhaul'] || 'Sin información';
+        const capacidadBackhaul = prop['Capacidad de backhaul (Mbps)'] || 'Sin información';
+
+        const content = `
+                <div>
+                    <h3 style="margin:0; font-size:16px; font-weight:bold;">Información de Torre ALTAN</h3>
+                    <p><strong>Marca RAN:</strong> ${marcaRAN}</p>
+                    <p><strong>Tipo RAN:</strong> ${tipoRAN}</p>
+                    <p><strong>Altura RAN (m):</strong> ${alturaRAN}</p>
+                    <p><strong>Proveedor backhaul:</strong> ${proveedorBackhaul}</p>
+                    <p><strong>Capacidad backhaul (Mbps):</strong> ${capacidadBackhaul}</p>
+                </div>
+            `;
+        popup.setLngLat(e.lngLat).setHTML(content).addTo(map);
+    });
+    map.on('mouseleave', 'torres-altan-layer', () => {
+        map.getCanvas().style.cursor = '';
+        popup.remove();
+    });
+
+    // Torres CFE
+    map.on('mouseenter', 'torres-cfe-layer', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const prop = e.features[0].properties;
+        const marcaRAN = prop['Marca RAN'] || 'Sin información';
+        const tipoRAN = prop['Tipo RAN'] || 'Sin información';
+        const alturaRAN = prop['Altura RAN (m)'] || 'Sin información';
+        const proveedorBackhaul = prop['Proveedor backhaul'] || 'Sin información';
+        const capacidadBackhaul = prop['Capacidad de backhaul (Mbps)'] || 'Sin información';
+
+        const content = `
+                <div>
+                    <h3 style="margin:0; font-size:16px; font-weight:bold;">Información de Torre CFE</h3>
+                    <p><strong>Marca RAN:</strong> ${marcaRAN}</p>
+                    <p><strong>Tipo RAN:</strong> ${tipoRAN}</p>
+                    <p><strong>Altura RAN (m):</strong> ${alturaRAN}</p>
+                    <p><strong>Proveedor backhaul:</strong> ${proveedorBackhaul}</p>
+                    <p><strong>Capacidad backhaul (Mbps):</strong> ${capacidadBackhaul}</p>
+                </div>
+            `;
+        popup.setLngLat(e.lngLat).setHTML(content).addTo(map);
+    });
+    map.on('mouseleave', 'torres-cfe-layer', () => {
+        map.getCanvas().style.cursor = '';
+        popup.remove();
+    });
+
+    // Telesecundarias
+    map.on('mouseenter', 'telesecundarias-layer', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const prop = e.features[0].properties;
+        const cNombre = prop['c_nombre'] || 'Sin información';
+        const numEs = prop['poblacion_'] || 'Sin información';
+        const nomEnt = prop['nom_ent'] || 'Sin información';
+        const nomMun = prop['nom_mun'] || 'Sin información';
+        const nomLoc = prop['nom_loc'] || 'Sin información';
+
+        const content = `
+                <div>
+                    <h3 style="margin:0; font-size:16px; font-weight:bold;">Información Telesecundaria</h3>
+                    <p><strong>Nombre:</strong> ${cNombre}</p>
+                    <p><strong>Estudiantes:</strong> ${numEs}</p>
+                    <p><strong>Entidad:</strong> ${nomEnt}</p>
+                    <p><strong>Municipio:</strong> ${nomMun}</p>
+                    <p><strong>Localidad:</strong> ${nomLoc}</p>
+                </div>
+            `;
+        popup.setLngLat(e.lngLat).setHTML(content).addTo(map);
+    });
+    map.on('mouseleave', 'telesecundarias-layer', () => {
+        map.getCanvas().style.cursor = '';
+        popup.remove();
+    });
+
+    // Telebachilleratos
+    map.on('mouseenter', 'telebachilleres-layer', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const prop = e.features[0].properties;
+        const cNombre = prop['c_nombre'] || 'Sin información';
+        const numEs = prop['poblacion_'] || 'Sin información';
+        const nomEnt = prop['nom_ent'] || 'Sin información';
+        const nomMun = prop['nom_mun'] || 'Sin información';
+        const nomLoc = prop['nom_loc'] || 'Sin información';
+
+        const content = `
+                <div>
+                    <h3 style="margin:0; font-size:16px; font-weight:bold;">Información Telebachillerato</h3>
+                    <p><strong>Nombre:</strong> ${cNombre}</p>
+                    <p><strong>Estudiantes:</strong> ${numEs}</p>
+                    <p><strong>Entidad:</strong> ${nomEnt}</p>
+                    <p><strong>Municipio:</strong> ${nomMun}</p>
+                    <p><strong>Localidad:</strong> ${nomLoc}</p>
+                </div>
+            `;
+        popup.setLngLat(e.lngLat).setHTML(content).addTo(map);
+    });
+    map.on('mouseleave', 'telebachilleres-layer', () => {
+        map.getCanvas().style.cursor = '';
+        popup.remove();
+    });
+    map.on('idle', () => {
+        if (map.getTerrain()) {
+            // Si el terreno está activo, mostrar hillshade
+            map.setLayoutProperty('hillshade-layer', 'visibility', 'visible');
+        } else {
+            // Si el terreno está desactivado, ocultar hillshade
+            map.setLayoutProperty('hillshade-layer', 'visibility', 'none');
+        }
+    });
+
+
+    const hamburgerMenu = document.getElementById('hamburger-menu');
+    const infoBox = document.getElementById('info-box');
+
+    function toggleMenu() {
+        infoBox.classList.toggle('collapsed');
+        if (infoBox.classList.contains('collapsed')) {
+            hamburgerMenu.textContent = '☰';
+        } else {
+            hamburgerMenu.textContent = '☰';
+        }
+    }
+    // Principal
+    const telesecundariasSwitch = document.getElementById('telesecundariasSwitch');
+    const telebachilleresSwitch = document.getElementById('telebachilleresSwitch');
+    const torresAltanSwitch = document.getElementById('torresAltanSwitch');
+    const torresCfeSwitch = document.getElementById('torresCfeSwitch');
+
+    // Sub-switches Telesecundarias
+    const telesecundariasSiSwitch = document.getElementById('telesecundariasSiSwitch');
+    const telesecundariasNoSwitch = document.getElementById('telesecundariasNoSwitch');
+
+    // Sub-switches Telebachilleratos
+    const telebachilleresSiSwitch = document.getElementById('telebachilleresSiSwitch');
+    const telebachilleresNoSwitch = document.getElementById('telebachilleresNoSwitch');
+
+    function updateTelesecundariasFilter() {
+        const siOn = telesecundariasSiSwitch.checked;
+        const noOn = telesecundariasNoSwitch.checked;
+        let coverage = [];
+        if (siOn) coverage.push("si");
+        if (noOn) coverage.push("no");
+
+        const filter = coverage.length > 0
+            ? ["match", ["get", "Cobertura"], coverage, true, false]
+            : ["match", ["get", "Cobertura"], ["xyz"], true, false];
+
+        map.setFilter('telesecundarias-layer', filter);
+    }
+
+    function updateTelebachilleresFilter() {
+        const siOn = telebachilleresSiSwitch.checked;
+        const noOn = telebachilleresNoSwitch.checked;
+        let coverage = [];
+        if (siOn) coverage.push("si");
+        if (noOn) coverage.push("no");
+
+        const filter = coverage.length > 0
+            ? ["match", ["get", "Cobertura"], coverage, true, false]
+            : ["match", ["get", "Cobertura"], ["xyz"], true, false];
+
+        map.setFilter('telebachilleres-layer', filter);
+    }
+
+    // Eventos para Telesecundarias
+    telesecundariasSwitch.addEventListener('change', () => {
+        const visibility = telesecundariasSwitch.checked ? 'visible' : 'none';
+        map.setLayoutProperty('telesecundarias-layer', 'visibility', visibility);
+
+        telesecundariasSiSwitch.disabled = !telesecundariasSwitch.checked;
+        telesecundariasNoSwitch.disabled = !telesecundariasSwitch.checked;
+
+        if (telesecundariasSwitch.checked) updateTelesecundariasFilter();
+    });
+
+    telesecundariasSiSwitch.addEventListener('change', updateTelesecundariasFilter);
+    telesecundariasNoSwitch.addEventListener('change', updateTelesecundariasFilter);
+
+    // Eventos para Telebachilleres
+    telebachilleresSwitch.addEventListener('change', () => {
+        const visibility = telebachilleresSwitch.checked ? 'visible' : 'none';
+        map.setLayoutProperty('telebachilleres-layer', 'visibility', visibility);
+
+        telebachilleresSiSwitch.disabled = !telebachilleresSwitch.checked;
+        telebachilleresNoSwitch.disabled = !telebachilleresSwitch.checked;
+
+        if (telebachilleresSwitch.checked) updateTelebachilleresFilter();
+    });
+
+    telebachilleresSiSwitch.addEventListener('change', updateTelebachilleresFilter);
+    telebachilleresNoSwitch.addEventListener('change', updateTelebachilleresFilter);
+
+    // Eventos para Torres ALTAN
+    torresAltanSwitch.addEventListener('change', () => {
+        const visibility = torresAltanSwitch.checked ? 'visible' : 'none';
+        map.setLayoutProperty('torres-altan-layer', 'visibility', visibility);
+    });
+
+    // Eventos para Torres CFE
+    torresCfeSwitch.addEventListener('change', () => {
+        const visibility = torresCfeSwitch.checked ? 'visible' : 'none';
+        map.setLayoutProperty('torres-cfe-layer', 'visibility', visibility);
+    });
+
+    // Ajustar estado inicial
+    // Telesecundarias y Telebachilleratos inician apagadas: sus sub-switches también deshabilitados
+    telesecundariasSiSwitch.disabled = !telesecundariasSwitch.checked; // telesecundariasSwitch sin checked
+    telesecundariasNoSwitch.disabled = !telesecundariasSwitch.checked;
+
+    telebachilleresSiSwitch.disabled = !telebachilleresSwitch.checked; // telebachilleresSwitch sin checked
+    telebachilleresNoSwitch.disabled = !telebachilleresSwitch.checked;
+</script>
+</body>
+
+</html>
